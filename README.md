@@ -17,7 +17,6 @@ Please provide at least one flag
     	Path to client private key
   -help
     	Display usage
-        var targetIP, port, password, tlsVersion, certFile, certKey string
   -ip string
     	Redis server IP address (default "your-redis-host")
   -numConnections int
