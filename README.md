@@ -12,26 +12,27 @@ use the flags to connect and measure the performance of a redis instance:
 ```text
 Please provide at least one flag
   -certFile string
-    	Path to client certificate
+        Path to client certificate
   -certKey string
-    	Path to client private key
+        Path to client private key
   -help
-    	Display usage
+        Display usage
   -ip string
-    	Redis server IP address (default "your-redis-host")
+        Redis server IP address (default "your-redis-host")
   -numConnections int
-    	Number of connections to establish (default 100)
+        Number of connections to establish (default 100)
   -password string
-    	Redis server password
+        Redis server password
   -port string
-    	Redis server port (default "6379")
+        Redis server port (default "6379")
+  -setCommand
+        Send additional SET command for every connection
   -tls
-    	Use TLS for connection
+        Use TLS for connection
   -tlsVersion string
-    	TLS version (1.2 or 1.3) (default "1.2")
+        TLS version (1.2 or 1.3) (default "1.2")
   -version
-    	Display version
-
+        Display version
 ```
 
 ## OS Configuration

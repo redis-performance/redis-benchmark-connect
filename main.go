@@ -13,7 +13,7 @@ var version = "1.0.0"
 
 func main() {
 	var targetIP, port, password, tlsVersion, certFile, certKey string
-	var useTLS, showHelp, showVersion bool
+	var useTLS, showHelp, showVersion, setCommand bool
 	var numConnections int
 
 	flag.StringVar(&targetIP, "ip", "your-redis-host", "Redis server IP address")
@@ -23,6 +23,7 @@ func main() {
 	flag.StringVar(&certFile, "certFile", "", "Path to client certificate")
 	flag.StringVar(&certKey, "certKey", "", "Path to client private key")
 	flag.BoolVar(&useTLS, "tls", false, "Use TLS for connection")
+	flag.BoolVar(&setCommand, "setCommand", false, "Send additional SET command for every connection")
 	flag.BoolVar(&showHelp, "help", false, "Display usage")
 	flag.BoolVar(&showVersion, "version", false, "Display version")
 	flag.IntVar(&numConnections, "numConnections", 100, "Number of connections to establish")
@@ -79,7 +80,7 @@ func main() {
 			return
 		}
 
-		// Dial the Redis server with TLS
+		// Test dial the Redis server with TLS
 		conn, err := redis.Dial("tcp", redisAddress, redis.DialPassword(password), redis.DialTLSConfig(tlsConfig))
 		if err != nil {
 			fmt.Println("Failed to connect to Redis with TLS:", err)
@@ -100,7 +101,17 @@ func main() {
 				fmt.Println("Failed to connect to Redis with TLS:", err)
 				return
 			}
-			conn.Close()
+
+			if setCommand {
+				_, err := conn.Do("SET", "test_key", "test_value")
+				if err != nil {
+					fmt.Println("Failed to execute SET command:", err)
+					conn.Close()  // Close the connection immediately if SET command fails
+					return
+				}
+			}
+		
+			defer conn.Close()
 
 			connElapsedTime := time.Since(connStartTime)
 			totalConnectionTime += connElapsedTime.Microseconds()
@@ -113,12 +124,22 @@ func main() {
 		// Use unencrypted connection
 		fmt.Println("Using unencrypted connection")
 
-		// Dial the Redis server without TLS
+		// Test dial the Redis server without TLS
 		conn, err := redis.Dial("tcp", redisAddress, redis.DialPassword(password))
 		if err != nil {
 			fmt.Println("Failed to connect to Redis without TLS:", err)
 			return
 		}
+		
+		if setCommand {
+			_, err := conn.Do("SET", "test_key", "test_value")
+			if err != nil {
+				fmt.Println("Failed to execute SET command:", err)
+				conn.Close()  // Close the connection immediately if SET command fails
+				return
+			}
+		}
+	
 		defer conn.Close()
 
 		// Measure connection rate for unencrypted connection
