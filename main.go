@@ -16,7 +16,7 @@ func main() {
 	var useTLS, showHelp, showVersion, setCommand bool
 	var numConnections int
 
-	flag.StringVar(&targetIP, "ip", "your-redis-host", "Redis server IP address")
+	flag.StringVar(&targetIP, "ip", "localhost", "Redis server IP address")
 	flag.StringVar(&port, "port", "6379", "Redis server port")
 	flag.StringVar(&password, "password", "", "Redis server password")
 	flag.StringVar(&tlsVersion, "tlsVersion", "1.2", "TLS version (1.2 or 1.3)")
@@ -41,12 +41,6 @@ func main() {
 	}
 
 	redisAddress := fmt.Sprintf("%s:%s", targetIP, port)
-
-	if flag.NFlag() == 0 {
-		fmt.Println("Please provide at least one flag")
-		flag.PrintDefaults()
-		return
-	}
 
 	if flag.Lookup("tls") != nil && flag.Lookup("tls").DefValue != flag.Lookup("tls").Value.String() {
 		useTLS = true
@@ -96,20 +90,19 @@ func main() {
 		for i := 0; i < numConnections; i++ {
 			connStartTime := time.Now()
 
-			conn, err := redis.Dial("tcp", redisAddress, redis.DialPassword(password), redis.DialTLSConfig(tlsConfig))
+			conn, err := redis.Dial("tcp", redisAddress, redis.DialPassword(password), redis.DialTLSConfig(tlsConfig), redis.DialKeepAlive(time.Duration(0)))
 			if err != nil {
 				fmt.Println("Failed to connect to Redis with TLS:", err)
 				return
 			}
-
-			if setCommand {
-				_, err := conn.Do("SET", "test_key", "test_value")
-				if err != nil {
-					fmt.Println("Failed to execute SET command:", err)
-					conn.Close()  // Close the connection immediately if SET command fails
-					return
-				}
+			_, err = conn.Do("HELLO")
+			if err != nil {
+    			fmt.Println("Failed to execute HELLO command:", err)
+    			conn.Close()  // Close the connection immediately if HELLO command fails
+    			return
 			}
+
+defer conn.Close()
 		
 			defer conn.Close()
 
@@ -130,15 +123,6 @@ func main() {
 			fmt.Println("Failed to connect to Redis without TLS:", err)
 			return
 		}
-		
-		if setCommand {
-			_, err := conn.Do("SET", "test_key", "test_value")
-			if err != nil {
-				fmt.Println("Failed to execute SET command:", err)
-				conn.Close()  // Close the connection immediately if SET command fails
-				return
-			}
-		}
 	
 		defer conn.Close()
 
@@ -150,13 +134,18 @@ func main() {
 		for i := 0; i < numConnections; i++ {
 			connStartTime := time.Now()
 
-			conn, err := redis.Dial("tcp", redisAddress, redis.DialPassword(password))
+			conn, err := redis.Dial("tcp", redisAddress, redis.DialPassword(password), redis.DialKeepAlive(time.Duration(0)))
 			if err != nil {
 				fmt.Println("Failed to connect to Redis without TLS:", err)
 				return
 			}
-			conn.Close()
-
+			_, err = conn.Do("HELLO")
+			if err != nil {
+    			fmt.Println("Failed to execute HELLO command:", err)
+    			conn.Close()  // Close the connection immediately if HELLO command fails
+    			return
+			}
+			defer conn.Close()
 			connElapsedTime := time.Since(connStartTime)
 			totalConnectionTime += connElapsedTime.Microseconds()
 		}
