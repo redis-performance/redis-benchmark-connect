@@ -101,8 +101,6 @@ func main() {
     			conn.Close()  // Close the connection immediately if HELLO command fails
     			return
 			}
-
-defer conn.Close()
 		
 			defer conn.Close()
 
