@@ -2,18 +2,20 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"sync"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 )
 
-var version = "1.0.1"
+var version = "1.0.2"
 
 func main() {
-	var targetIP, port, password, tlsVersion, certFile, certKey string
+	var targetIP, port, password, tlsVersion, certFile, certKey, caCertFile string
 	var useTLS, showHelp, showVersion, setCommand, parallel bool
 	var numConnections int
 
@@ -23,6 +25,7 @@ func main() {
 	flag.StringVar(&tlsVersion, "tlsVersion", "1.2", "TLS version (1.2 or 1.3)")
 	flag.StringVar(&certFile, "certFile", "", "Path to client certificate")
 	flag.StringVar(&certKey, "certKey", "", "Path to client private key")
+	flag.StringVar(&caCertFile, "caCertFile", "", "Path a file containing CA certificates")
 	flag.BoolVar(&useTLS, "tls", false, "Use TLS for connection")
 	flag.BoolVar(&setCommand, "setCommand", false, "Send additional SET command for every connection")
 	flag.BoolVar(&showHelp, "help", false, "Display usage")
@@ -49,16 +52,20 @@ func main() {
 	}
 
 	if useTLS {
-		establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, numConnections, parallel)
+		establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile, numConnections, parallel)
 	} else {
 		establishUnencryptedConnections(redisAddress, password, numConnections, parallel)
 	}
 }
 
-func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey string, numConnections int, parallel bool) {
+func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile string, numConnections int, parallel bool) {
 	fmt.Println("Using TLS for connection")
 
-	tlsConfig := createTLSConfig(tlsVersion, certFile, certKey)
+	tlsConfig, tlsConfigError := createTLSConfig(tlsVersion, certFile, certKey, caCertFile)
+
+	if tlsConfigError != nil {
+		 fmt.Println("error in TLS config: %v", tlsConfigError)
+	}
 
 	if parallel {
 		testAndMeasureConnectionsParallel(redisAddress, password, tlsConfig, numConnections)
@@ -79,29 +86,40 @@ func establishUnencryptedConnections(redisAddress, password string, numConnectio
 	}
 }
 
-func createTLSConfig(tlsVersion, certFile, certKey string) *tls.Config {
-	tlsConfig := &tls.Config{}
+func createTLSConfig(tlsVersion, certFile, certKey, caCertFile string) (*tls.Config, error) {
+    tlsConfig := &tls.Config{}
 
-	if certFile != "" && certKey != "" {
-		cert, err := tls.LoadX509KeyPair(certFile, certKey)
-		if err != nil {
-			fmt.Println("Error loading client certificate:", err)
-			return nil
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
-	}
+    // Load client certificate and private key if provided
+    if certFile != "" && certKey != "" {
+        cert, err := tls.LoadX509KeyPair(certFile, certKey)
+        if err != nil {
+            return nil, fmt.Errorf("error loading client certificate: %v", err)
+        }
+        tlsConfig.Certificates = []tls.Certificate{cert}
+    }
 
-	switch tlsVersion {
-	case "1.2":
-		tlsConfig.MaxVersion = tls.VersionTLS12
-	case "1.3":
-		tlsConfig.MaxVersion = tls.VersionTLS13
-	default:
-		fmt.Println("Invalid TLS version specified")
-		return nil
-	}
+    // Load CA certificates if provided
+    if caCertFile != "" {
+        caCert, err := ioutil.ReadFile(caCertFile)
+        if err != nil {
+            return nil, fmt.Errorf("error reading CA certificate file: %v", err)
+        }
+        caCertPool := x509.NewCertPool()
+        caCertPool.AppendCertsFromPEM(caCert)
+        tlsConfig.RootCAs = caCertPool
+    }
 
-	return tlsConfig
+    // Set TLS version based on the specified parameter
+    switch tlsVersion {
+    case "1.2":
+        tlsConfig.MaxVersion = tls.VersionTLS12
+    case "1.3":
+        tlsConfig.MaxVersion = tls.VersionTLS13
+    default:
+        return nil, fmt.Errorf("invalid TLS version specified")
+    }
+
+    return tlsConfig, nil
 }
 
 func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Config, numConnections int) {
