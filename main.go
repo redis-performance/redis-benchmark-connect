@@ -138,6 +138,7 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 			fmt.Printf("Failed to connect to Redis %s:%s: %v\n", redisAddress, password, err)
 			return
 		}
+		connElapsedTime := time.Since(connStartTime)
 
 		if hello {
 			_, err = conn.Do("HELLO")
@@ -151,7 +152,6 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 
 		defer conn.Close()
 
-		connElapsedTime := time.Since(connStartTime)
 		totalConnectionTime += float32(connElapsedTime.Milliseconds())
 	}
 
@@ -187,6 +187,7 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 				fmt.Printf("Failed to connect to Redis %s:%s: %v\n", redisAddress, password, err)
 				return
 			}
+			connElapsedTime := time.Since(connStartTime)
 			if hello {
 				_, err = conn.Do("HELLO")
 				if err != nil {
@@ -197,8 +198,6 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 			}
 
 			defer conn.Close()
-
-			connElapsedTime := time.Since(connStartTime)
 			totalConnectionTime += float32(connElapsedTime.Milliseconds())
 		}()
 	}
