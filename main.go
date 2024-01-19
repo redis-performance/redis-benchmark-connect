@@ -205,8 +205,8 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 
 	wg.Wait()
 
-	elapsedTime := time.Since(startTime).Milliseconds()
-	avgConnectionTime := float32(totalConnectionTime) / float32(numConnections)
+	elapsedTime := time.Since(startTime)
+	avgConnectionTime := totalConnectionTime / float32(numConnections)
 
 	if tlsConfig != nil {
 		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %.3fms\n", numConnections, elapsedTime, avgConnectionTime)
