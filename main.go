@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
@@ -16,7 +17,7 @@ var version = "1.0.2"
 
 func main() {
 	var targetIP, port, password, tlsVersion, certFile, certKey, caCertFile string
-	var useTLS, showHelp, showVersion, setCommand, parallel, hello bool
+	var useTLS, showHelp, showVersion, setCommand, parallel, hello, outputFile bool
 	var numConnections int
 
 	flag.StringVar(&targetIP, "ip", "localhost", "Redis server IP address")
@@ -32,6 +33,7 @@ func main() {
 	flag.BoolVar(&parallel, "parallel", false, "Run connections in parallel")
 	flag.BoolVar(&showVersion, "version", false, "Display version")
 	flag.BoolVar(&hello, "hello", false, "Send Hello command after connection")
+	flag.BoolVar(&outputFile, "outputFile", false, "Send per connection timing to a file, provide a file name")
 	flag.IntVar(&numConnections, "numConnections", 100, "Number of connections to establish")
 
 	flag.Parse()
@@ -53,13 +55,13 @@ func main() {
 	}
 
 	if useTLS {
-		establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile, numConnections, parallel, hello)
+		establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile, numConnections, parallel, hello, outputFile)
 	} else {
-		establishUnencryptedConnections(redisAddress, password, numConnections, parallel, hello)
+		establishUnencryptedConnections(redisAddress, password, numConnections, parallel, hello, outputFile)
 	}
 }
 
-func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile string, numConnections int, parallel, hello bool) {
+func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile string, numConnections int, parallel, hello, outputFile bool) {
 	fmt.Println("Using TLS for connection")
 
 	tlsConfig, tlsConfigError := createTLSConfig(tlsVersion, certFile, certKey, caCertFile)
@@ -69,19 +71,19 @@ func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certK
 	}
 
 	if parallel {
-		testAndMeasureConnectionsParallel(redisAddress, password, tlsConfig, numConnections, hello)
+		testAndMeasureConnectionsParallel(redisAddress, password, tlsConfig, numConnections, hello, outputFile)
 	} else {
-		testAndMeasureConnections(redisAddress, password, tlsConfig, numConnections, hello)
+		testAndMeasureConnections(redisAddress, password, tlsConfig, numConnections, hello, outputFile)
 	}
 }
 
-func establishUnencryptedConnections(redisAddress, password string, numConnections int, parallel, hello bool) {
+func establishUnencryptedConnections(redisAddress, password string, numConnections int, parallel, hello, outputFile bool) {
 	fmt.Println("Using unencrypted connection")
 
 	if parallel {
-		testAndMeasureConnectionsParallel(redisAddress, password, nil, numConnections, hello)
+		testAndMeasureConnectionsParallel(redisAddress, password, nil, numConnections, hello, outputFile)
 	} else {
-		testAndMeasureConnections(redisAddress, password, nil, numConnections, hello)
+		testAndMeasureConnections(redisAddress, password, nil, numConnections, hello, outputFile)
 	}
 }
 
@@ -121,9 +123,10 @@ func createTLSConfig(tlsVersion, certFile, certKey, caCertFile string) (*tls.Con
     return tlsConfig, nil
 }
 
-func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Config, numConnections int, hello bool) {
+func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Config, numConnections int, hello, outputFile bool) {
 	startTime := time.Now()
 	var totalConnectionTime float32
+	var file *os.File
 
 	for i := 0; i < numConnections; i++ {
 		connStartTime := time.Now()
@@ -139,6 +142,20 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 			return
 		}
 		connElapsedTime := time.Since(connStartTime)
+		if outputFile {
+			file, err = os.OpenFile("output.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				fmt.Println("Error creating file:", err)
+				return
+			}
+			_, err = fmt.Fprintf(file, "%.3f\n", float32(connElapsedTime.Milliseconds()))
+			if err != nil {
+				fmt.Println("Error writing to the file:", err)
+				return
+			}
+			defer file.Close()
+		}
+
 		if hello {
 			_, err = conn.Do("HELLO")
 			duration := 10 * time.Second
@@ -165,10 +182,11 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 	}
 }
 
-func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig *tls.Config, numConnections int, hello bool) {
+func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig *tls.Config, numConnections int, hello, outputFile bool) {
 	var wg sync.WaitGroup
 	startTime := time.Now()
 	var totalConnectionTime float32
+	var file *os.File
 
 	for i := 0; i < numConnections; i++ {
 		wg.Add(1)
@@ -188,6 +206,21 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 				return
 			}
 			connElapsedTime := time.Since(connStartTime)
+			if outputFile {
+				file, err = os.OpenFile("output.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+				if err != nil {
+					fmt.Println("Error creating file:", err)
+					return
+				}
+				_, err = fmt.Fprintf(file, "%.3f\n", float32(connElapsedTime.Milliseconds()))
+				if err != nil {
+					fmt.Println("Error writing to the file:", err)
+					return
+				}
+				defer file.Close()
+			}
+	
 			if hello {
 				_, err = conn.Do("HELLO")
 				duration := 10 * time.Second
