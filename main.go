@@ -159,9 +159,9 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 	avgConnectionTime := float32(totalConnectionTime) / float32(numConnections)
 
 	if tlsConfig != nil {
-		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %.2fms\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %.3fms\n", numConnections, elapsedTime, avgConnectionTime)
 	} else {
-		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time:  %.2fms\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time:  %.3fms\n", numConnections, elapsedTime, avgConnectionTime)
 	}
 }
 
@@ -209,8 +209,8 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 	avgConnectionTime := float32(totalConnectionTime) / float32(numConnections)
 
 	if tlsConfig != nil {
-		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %.2fms\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %.3fms\n", numConnections, elapsedTime, avgConnectionTime)
 	} else {
-		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time: %.2fms\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time: %.3fms\n", numConnections, elapsedTime, avgConnectionTime)
 	}
 }
