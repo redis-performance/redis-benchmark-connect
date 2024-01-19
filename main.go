@@ -123,7 +123,7 @@ func createTLSConfig(tlsVersion, certFile, certKey, caCertFile string) (*tls.Con
 
 func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Config, numConnections int, hello bool) {
 	startTime := time.Now()
-	var totalConnectionTime int64
+	var totalConnectionTime float32
 
 	for i := 0; i < numConnections; i++ {
 		connStartTime := time.Now()
@@ -152,23 +152,23 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 		defer conn.Close()
 
 		connElapsedTime := time.Since(connStartTime)
-		totalConnectionTime += connElapsedTime.Milliseconds()
+		totalConnectionTime += float32(connElapsedTime.Milliseconds())
 	}
 
 	elapsedTime := time.Since(startTime)
-	avgConnectionTime := totalConnectionTime / int64(numConnections)
+	avgConnectionTime := float32(totalConnectionTime) / float32(numConnections)
 
 	if tlsConfig != nil {
-		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %d ms\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %.2fms\n", numConnections, elapsedTime, avgConnectionTime)
 	} else {
-		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time: %dms\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time:  %.2fms\n", numConnections, elapsedTime, avgConnectionTime)
 	}
 }
 
 func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig *tls.Config, numConnections int, hello bool) {
 	var wg sync.WaitGroup
 	startTime := time.Now()
-	var totalConnectionTime int64
+	var totalConnectionTime float32
 
 	for i := 0; i < numConnections; i++ {
 		wg.Add(1)
@@ -199,18 +199,18 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 			defer conn.Close()
 
 			connElapsedTime := time.Since(connStartTime)
-			totalConnectionTime += connElapsedTime.Milliseconds()
+			totalConnectionTime += float32(connElapsedTime.Milliseconds())
 		}()
 	}
 
 	wg.Wait()
 
 	elapsedTime := time.Since(startTime).Milliseconds()
-	avgConnectionTime := totalConnectionTime / int64(numConnections)
+	avgConnectionTime := float32(totalConnectionTime) / float32(numConnections)
 
 	if tlsConfig != nil {
-		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %dms\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %.2fms\n", numConnections, elapsedTime, avgConnectionTime)
 	} else {
-		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time: %dms\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time: %.2fms\n", numConnections, elapsedTime, avgConnectionTime)
 	}
 }
