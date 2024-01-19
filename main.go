@@ -16,7 +16,7 @@ var version = "1.0.2"
 
 func main() {
 	var targetIP, port, password, tlsVersion, certFile, certKey, caCertFile string
-	var useTLS, showHelp, showVersion, setCommand, parallel bool
+	var useTLS, showHelp, showVersion, setCommand, parallel, hello bool
 	var numConnections int
 
 	flag.StringVar(&targetIP, "ip", "localhost", "Redis server IP address")
@@ -31,6 +31,7 @@ func main() {
 	flag.BoolVar(&showHelp, "help", false, "Display usage")
 	flag.BoolVar(&parallel, "parallel", false, "Run connections in parallel")
 	flag.BoolVar(&showVersion, "version", false, "Display version")
+	flag.BoolVar(&hello, "hello", false, "Send Hello command after connection")
 	flag.IntVar(&numConnections, "numConnections", 100, "Number of connections to establish")
 
 	flag.Parse()
@@ -52,13 +53,13 @@ func main() {
 	}
 
 	if useTLS {
-		establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile, numConnections, parallel)
+		establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile, numConnections, parallel, hello)
 	} else {
-		establishUnencryptedConnections(redisAddress, password, numConnections, parallel)
+		establishUnencryptedConnections(redisAddress, password, numConnections, parallel, hello)
 	}
 }
 
-func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile string, numConnections int, parallel bool) {
+func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile string, numConnections int, parallel, hello bool) {
 	fmt.Println("Using TLS for connection")
 
 	tlsConfig, tlsConfigError := createTLSConfig(tlsVersion, certFile, certKey, caCertFile)
@@ -68,21 +69,19 @@ func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certK
 	}
 
 	if parallel {
-		testAndMeasureConnectionsParallel(redisAddress, password, tlsConfig, numConnections)
+		testAndMeasureConnectionsParallel(redisAddress, password, tlsConfig, numConnections, hello)
 	} else {
-		testAndMeasureConnections(redisAddress, password, tlsConfig, numConnections)
+		testAndMeasureConnections(redisAddress, password, tlsConfig, numConnections, hello)
 	}
-	
-	
 }
 
-func establishUnencryptedConnections(redisAddress, password string, numConnections int, parallel bool) {
+func establishUnencryptedConnections(redisAddress, password string, numConnections int, parallel, hello bool) {
 	fmt.Println("Using unencrypted connection")
 
 	if parallel {
-		testAndMeasureConnectionsParallel(redisAddress, password, nil, numConnections)
+		testAndMeasureConnectionsParallel(redisAddress, password, nil, numConnections, hello)
 	} else {
-		testAndMeasureConnections(redisAddress, password, nil, numConnections)
+		testAndMeasureConnections(redisAddress, password, nil, numConnections, hello)
 	}
 }
 
@@ -122,7 +121,7 @@ func createTLSConfig(tlsVersion, certFile, certKey, caCertFile string) (*tls.Con
     return tlsConfig, nil
 }
 
-func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Config, numConnections int) {
+func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Config, numConnections int, hello bool) {
 	startTime := time.Now()
 	var totalConnectionTime int64
 
@@ -140,12 +139,14 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 			return
 		}
 
-		_, err = conn.Do("HELLO")
+		if hello {
+			_, err = conn.Do("HELLO")
 
-		if err != nil {
-			fmt.Println("Failed to execute HELLO command:", err)
-			conn.Close()
-			return
+			if err != nil {
+				fmt.Println("Failed to execute HELLO command:", err)
+				conn.Close()
+				return
+			}
 		}
 
 		defer conn.Close()
@@ -164,7 +165,7 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 	}
 }
 
-func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig *tls.Config, numConnections int) {
+func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig *tls.Config, numConnections int, hello bool) {
 	var wg sync.WaitGroup
 	startTime := time.Now()
 	var totalConnectionTime int64
@@ -186,14 +187,16 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 				fmt.Printf("Failed to connect to Redis %s:%s: %v\n", redisAddress, password, err)
 				return
 			}
-
-			// _, err = conn.Do("HELLO")
-
-			// if err != nil {
-			// 	fmt.Println("Failed to execute HELLO command:", err)
-			// 	conn.Close()
-			// 	return
-			// }
+			
+			if hello {
+				_, err = conn.Do("HELLO")
+	
+				if err != nil {
+					fmt.Println("Failed to execute HELLO command:", err)
+					conn.Close()
+					return
+				}
+			}
 
 			defer conn.Close()
 
