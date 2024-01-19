@@ -152,7 +152,6 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 
 		connElapsedTime := time.Since(connStartTime)
 		totalConnectionTime += connElapsedTime.Milliseconds()
-		fmt.Printf("%.3f\n", float64(totalConnectionTime))
 	}
 
 	elapsedTime := time.Since(startTime)
