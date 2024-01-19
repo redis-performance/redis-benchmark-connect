@@ -139,10 +139,10 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 			return
 		}
 		connElapsedTime := time.Since(connStartTime)
-
 		if hello {
 			_, err = conn.Do("HELLO")
-
+			duration := 10 * time.Second
+			time.Sleep(duration)
 			if err != nil {
 				fmt.Println("Failed to execute HELLO command:", err)
 				conn.Close()
@@ -190,6 +190,8 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 			connElapsedTime := time.Since(connStartTime)
 			if hello {
 				_, err = conn.Do("HELLO")
+				duration := 10 * time.Second
+				time.Sleep(duration)
 				if err != nil {
 					fmt.Println("Failed to execute HELLO command:", err)
 					conn.Close()
