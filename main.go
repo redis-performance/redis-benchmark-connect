@@ -156,12 +156,12 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 	}
 
 	elapsedTime := time.Since(startTime)
-	avgConnectionTime := float64(totalConnectionTime) / float64(numConnections) / 1000
+	avgConnectionTime := totalConnectionTime / int64(numConnections)
 
 	if tlsConfig != nil {
-		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %.3f milliseconds\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %d ms\n", numConnections, elapsedTime, avgConnectionTime)
 	} else {
-		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time: %.3f milliseconds\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time: %dms\n", numConnections, elapsedTime, avgConnectionTime)
 	}
 }
 
@@ -187,10 +187,8 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 				fmt.Printf("Failed to connect to Redis %s:%s: %v\n", redisAddress, password, err)
 				return
 			}
-			
 			if hello {
 				_, err = conn.Do("HELLO")
-	
 				if err != nil {
 					fmt.Println("Failed to execute HELLO command:", err)
 					conn.Close()
@@ -207,12 +205,12 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 
 	wg.Wait()
 
-	elapsedTime := time.Since(startTime)
-	avgConnectionTime := float64(totalConnectionTime) / float64(numConnections) / 1000
+	elapsedTime := time.Since(startTime).Milliseconds()
+	avgConnectionTime := totalConnectionTime / int64(numConnections)
 
 	if tlsConfig != nil {
-		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %.3f milliseconds\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d TLS connections in %v\nAverage connection time: %dms\n", numConnections, elapsedTime, avgConnectionTime)
 	} else {
-		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time: %.3f milliseconds\n", numConnections, elapsedTime, avgConnectionTime)
+		fmt.Printf("Established %d unencrypted connections in %v\nAverage connection time: %dms\n", numConnections, elapsedTime, avgConnectionTime)
 	}
 }
