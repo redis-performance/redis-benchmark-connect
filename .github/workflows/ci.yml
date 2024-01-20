@@ -10,22 +10,6 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
     - uses: actions/checkout@v2
-    - name: Install dependencies
-      run: |
-        sudo apt-get -qq update
-        sudo apt-get install lcov autoconf automake pkg-config libevent-dev libpcre3-dev libssl-dev
-
-    - name: Build
-      run: autoreconf -ivf && ./configure --enable-code-coverage && make -j
-    - name: Setup Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.10'
-        architecture: x64
-
-    - name: Install Python dependencies
-      run: pip install -r ./tests/test_requirements.txt
-
     - name: Generate TLS test certificates
       if: matrix.platform == 'ubuntu-latest'
       run: |
