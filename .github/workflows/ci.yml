@@ -1,0 +1,73 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build-ubuntu:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, ubuntu-20.04]
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install lcov autoconf automake pkg-config libevent-dev libpcre3-dev libssl-dev
+
+    - name: Build
+      run: autoreconf -ivf && ./configure --enable-code-coverage && make -j
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+        architecture: x64
+
+    - name: Install Python dependencies
+      run: pip install -r ./tests/test_requirements.txt
+
+    - name: Generate TLS test certificates
+      if: matrix.platform == 'ubuntu-latest'
+      run: |
+        ./tests/gen-test-certs.sh
+
+    - name: Install Redis
+      run: |
+        curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+        sudo apt-get -qq update
+        sudo apt-get install redis
+        sudo service redis-server stop
+
+    - name: Run Redis
+      run: |
+        redis-server  --tls-port 6380 --port 6379  \
+            --tls-cert-file ./tls/redis.crt  \
+            --tls-key-file ./tls/redis.key  \
+            --tls-ca-cert-file ./tls/ca.crt \
+            --tls-auth-clients no \
+            --daemonize true
+
+
+    - name: Test OSS TCP
+      timeout-minutes: 10
+      run: |
+        ./tests/run_tests.sh
+
+    - name: Test OSS TCP TLS
+      if: matrix.platform == 'ubuntu-latest'
+      timeout-minutes: 10
+      run: |
+        TLS=1 ./tests/run_tests.sh
+
+    - name: Test OSS TCP TLS v1.2
+      if: matrix.platform == 'ubuntu-latest'
+      timeout-minutes: 10
+      run: |
+        TLS_PROTOCOLS="tlsv1.2" TLS=1 ./tests/run_tests.sh
+
+    - name: Test OSS TCP TLS v1.3
+      if: matrix.platform == 'ubuntu-latest'
+      timeout-minutes: 10
+      run: |
+        TLS_PROTOCOLS="tlsv1.3" TLS=1 ./tests/run_tests.sh

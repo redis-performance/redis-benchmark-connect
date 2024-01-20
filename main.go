@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -17,7 +16,7 @@ var version = "1.0.2"
 
 func main() {
 	var targetIP, port, password, tlsVersion, certFile, certKey, caCertFile string
-	var useTLS, showHelp, showVersion, setCommand, parallel, hello, outputFile bool
+	var useTLS, tlsInsecureSkipVerify, showHelp, showVersion, setCommand, parallel, hello, outputFile bool
 	var numConnections int
 
 	flag.StringVar(&targetIP, "ip", "localhost", "Redis server IP address")
@@ -28,6 +27,7 @@ func main() {
 	flag.StringVar(&certKey, "certKey", "", "Path to client private key")
 	flag.StringVar(&caCertFile, "caCertFile", "", "Path a file containing CA certificates")
 	flag.BoolVar(&useTLS, "tls", false, "Use TLS for connection")
+	flag.BoolVar(&tlsInsecureSkipVerify, "tlsSkipVerify", false, "Skip verification of server certificate")
 	flag.BoolVar(&setCommand, "setCommand", false, "Send additional SET command for every connection")
 	flag.BoolVar(&showHelp, "help", false, "Display usage")
 	flag.BoolVar(&parallel, "parallel", false, "Run connections in parallel")
@@ -55,19 +55,19 @@ func main() {
 	}
 
 	if useTLS {
-		establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile, numConnections, parallel, hello, outputFile)
+		establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile, tlsInsecureSkipVerify, numConnections, parallel, hello, outputFile)
 	} else {
 		establishUnencryptedConnections(redisAddress, password, numConnections, parallel, hello, outputFile)
 	}
 }
 
-func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile string, numConnections int, parallel, hello, outputFile bool) {
+func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certKey, caCertFile string, InsecureSkipVerify bool, numConnections int, parallel, hello, outputFile bool) {
 	fmt.Println("Using TLS for connection")
 
-	tlsConfig, tlsConfigError := createTLSConfig(tlsVersion, certFile, certKey, caCertFile)
+	tlsConfig, tlsConfigError := createTLSConfig(tlsVersion, certFile, certKey, caCertFile, InsecureSkipVerify)
 
 	if tlsConfigError != nil {
-		 fmt.Println("error in TLS config: %v", tlsConfigError)
+		fmt.Println("error in TLS config: %v", tlsConfigError)
 	}
 
 	if parallel {
@@ -87,40 +87,50 @@ func establishUnencryptedConnections(redisAddress, password string, numConnectio
 	}
 }
 
-func createTLSConfig(tlsVersion, certFile, certKey, caCertFile string) (*tls.Config, error) {
-    tlsConfig := &tls.Config{}
+func createTLSConfig(tlsVersion, certFile, certKey, caCertFile string, tlsInsecureSkipVerify bool) (*tls.Config, error) {
+	tlsConfig := &tls.Config{}
 
-    // Load client certificate and private key if provided
-    if certFile != "" && certKey != "" {
-        cert, err := tls.LoadX509KeyPair(certFile, certKey)
-        if err != nil {
-            return nil, fmt.Errorf("error loading client certificate: %v", err)
-        }
-        tlsConfig.Certificates = []tls.Certificate{cert}
-    }
+	// Load client certificate and private key if provided
+	if certFile != "" && certKey != "" {
+		cert, err := tls.LoadX509KeyPair(certFile, certKey)
+		if err != nil {
+			return nil, fmt.Errorf("error loading client certificate: %v", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
 
-    // Load CA certificates if provided
-    if caCertFile != "" {
-        caCert, err := ioutil.ReadFile(caCertFile)
-        if err != nil {
-            return nil, fmt.Errorf("error reading CA certificate file: %v", err)
-        }
-        caCertPool := x509.NewCertPool()
-        caCertPool.AppendCertsFromPEM(caCert)
-        tlsConfig.RootCAs = caCertPool
-    }
+	// Load CA certificates if provided
+	if caCertFile != "" {
+		caCert, err := os.ReadFile(caCertFile)
+		if err != nil {
+			return nil, fmt.Errorf("error reading CA certificate file: %v", err)
+		}
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		tlsConfig.RootCAs = caCertPool
+	}
 
-    // Set TLS version based on the specified parameter
-    switch tlsVersion {
-    case "1.2":
-        tlsConfig.MaxVersion = tls.VersionTLS12
-    case "1.3":
-        tlsConfig.MaxVersion = tls.VersionTLS13
-    default:
-        return nil, fmt.Errorf("invalid TLS version specified")
-    }
+	if tlsVersion != "" {
+		// Set TLS version based on the specified parameter
+		switch tlsVersion {
+		case "1.2":
+			tlsConfig.MaxVersion = tls.VersionTLS12
+		case "1.3":
+			tlsConfig.MaxVersion = tls.VersionTLS13
+		default:
+			return nil, fmt.Errorf("invalid TLS version specified")
+		}
+	}
 
-    return tlsConfig, nil
+	// InsecureSkipVerify controls whether a client verifies the
+	// server's certificate chain and host name.
+	// If InsecureSkipVerify is true, TLS accepts any certificate
+	// presented by the server and any host name in that certificate.
+	// In this mode, TLS is susceptible to man-in-the-middle attacks.
+	// This should be used only for testing.
+	tlsConfig.InsecureSkipVerify = tlsInsecureSkipVerify
+
+	return tlsConfig, nil
 }
 
 func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Config, numConnections int, hello, outputFile bool) {
@@ -134,7 +144,14 @@ func testAndMeasureConnections(redisAddress, password string, tlsConfig *tls.Con
 		conn, err := redis.Dial("tcp", redisAddress, redis.DialPassword(password))
 
 		if tlsConfig != nil {
-			conn, err = redis.Dial("tcp", redisAddress, redis.DialPassword(password), redis.DialTLSConfig(tlsConfig), redis.DialKeepAlive(time.Duration(0)))
+			conn, err = redis.Dial(
+				"tcp",
+				redisAddress,
+				redis.DialPassword(password),
+				redis.DialTLSConfig(tlsConfig),
+				redis.DialUseTLS(true),
+				redis.DialTLSSkipVerify(tlsConfig.InsecureSkipVerify),
+				redis.DialKeepAlive(time.Duration(0)))
 		}
 
 		if err != nil {
@@ -220,7 +237,7 @@ func testAndMeasureConnectionsParallel(redisAddress, password string, tlsConfig 
 				}
 				defer file.Close()
 			}
-	
+
 			if hello {
 				_, err = conn.Do("HELLO")
 				duration := 10 * time.Second
