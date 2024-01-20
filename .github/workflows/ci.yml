@@ -32,6 +32,9 @@ jobs:
             --tls-auth-clients no \
             --daemonize yes
 
+    - name: build tool
+      run: |
+        go build .  
 
     - name: Test OSS TCP
       timeout-minutes: 10
