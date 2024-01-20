@@ -12,7 +12,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-var version = "1.0.2"
+var version = "1.0.3"
 
 func main() {
 	var targetIP, port, password, tlsVersion, certFile, certKey, caCertFile string
@@ -67,7 +67,7 @@ func establishTLSConnections(redisAddress, password, tlsVersion, certFile, certK
 	tlsConfig, tlsConfigError := createTLSConfig(tlsVersion, certFile, certKey, caCertFile, InsecureSkipVerify)
 
 	if tlsConfigError != nil {
-		fmt.Println("error in TLS config: %v", tlsConfigError)
+		fmt.Printf("error in TLS config: %v", tlsConfigError)
 	}
 
 	if parallel {
