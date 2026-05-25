@@ -4,14 +4,16 @@ We treat this repo as "Open Source" within Redis: anyone who clears the bar belo
 
 ## Local setup
 
-<!-- TODO: fill in repo-specific setup steps -->
-
 ```bash
-# Example — replace with actual steps
-git clone git@github.com:redis-performance/<repo>.git
-cd <repo>
-# install dependencies, build, etc.
+git clone git@github.com:redis-performance/redis-benchmark-connect.git
+cd redis-benchmark-connect
+go mod download
+go build -o redis_benchmark_connect .
 ```
+
+Requires **Go 1.20 or later**.
+
+For TLS-related testing you also need `openssl` available on your PATH.
 
 ## Branch naming
 
@@ -42,10 +44,31 @@ Example: `feat/add-pipeline-mode`
 - Existing tests must pass: run the test suite locally before opening a PR.
 - Coverage should not decrease.
 
-<!-- TODO: add the exact test command for this repo -->
+Run the full test suite (requires a local Redis instance on port 6379):
+
+```bash
+# Build the binary first
+go build -o redis_benchmark_connect .
+
+# Run plain TCP tests
+./tests/run_tests.sh
+
+# Run TLS tests (generates self-signed certs via openssl, starts Redis on port 6380)
+./tests/gen-test-certs.sh
+TLS=1 ./tests/run_tests.sh
+```
+
+Individual TLS protocol variants:
+
+```bash
+TLS_PROTOCOLS="tlsv1.2" TLS=1 ./tests/run_tests.sh
+TLS_PROTOCOLS="tlsv1.3" TLS=1 ./tests/run_tests.sh
+```
+
+CI runs the same steps across Ubuntu on Go 1.20.x and 1.21.x (see `.github/workflows/ci.yml`).
 
 ## Review process
 
 - At least one maintainer approval is required before merge.
 - CI must be green.
-- Maintainers may request changes or close PRs that don't meet the bar — this is normal and not personal.
+- Maintainers may request changes or close PRs that do not meet the bar — this is normal and not personal.
